@@ -1,64 +1,72 @@
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const CONTEXT = `Zenara Flow helps psychiatry practices extend care beyond the monthly office visit: organising clinical signal between visits, preparing the clinician before a visit, and making that continuous work billable. It is built by a practising psychiatrist, Dr. Ravi Hariprasad. It does not diagnose, does not treat, and does not replace clinical judgement. Assess, the pre-visit assessment module, is the part available today.`;
+import { callClaude, extractJson } from "../../lib/anthropic";
+
+const SENDER = {
+  name: "Dr. Ravi Hariprasad",
+  signoff: "Ravi",
+  title: "practising psychiatrist and founder of Zenara Health",
+};
+
+const PRODUCT = `Zenara Flow helps psychiatry practices extend care beyond the monthly office visit: organising clinical signal between visits, preparing the clinician before a visit, and making that continuous work billable. It is built by a practising psychiatrist, Dr. Ravi Hariprasad. It does not diagnose, does not treat, and does not replace clinical judgement. Assess, the pre-visit assessment module, is the part available today.`;
 
 export async function POST(req) {
-  const { practice, signals } = await req.json();
+  const { practice = {}, signals = [], hook = "", angle = "" } = await req.json();
 
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) {
-    return Response.json({ error: "ANTHROPIC_API_KEY is not set." }, { status: 500 });
-  }
+  const prompt = `Write a short first-touch email from ${SENDER.name}, a ${SENDER.title}, to the practice below. This is an icebreaker, not a pitch deck.
 
-  const prompt = `Write a short first-touch email from Dr. Ravi Hariprasad, a practising psychiatrist and founder of Zenara Health, to this practice.
+ABOUT THE SENDER'S PRODUCT
+${PRODUCT}
 
-About Zenara: ${CONTEXT}
-
-Recipient practice: ${practice.name}
+THE RECIPIENT PRACTICE
+Name: ${practice.name}
 Location: ${practice.address || "not listed"}
-Signals observed on their own public website:
-${(signals || []).map((s) => "- " + s).join("\n") || "- none recorded"}
-
-Rules:
-- Subject line on the first line, then the body. Under 120 words total.
-- Open with something specific to THIS practice drawn from the signals. Never a generic opener.
-- Peer to peer, one psychiatrist writing to another practice. Plain, unsalesy.
-- State plainly that Flow does not diagnose, treat, or replace clinical judgement.
-- Ask for a short conversation. Do not offer a demo or a deck.
-- No em dashes. No exclamation marks. Do not invent metrics, patient numbers, or any fact not given above.
-- Sign off as Ravi.
-
-Return the email text only.`;
-
-  try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": key,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 700,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    const data = await r.json();
-    if (data.error) {
-      return Response.json({ error: data.error.message }, { status: 502 });
-    }
-
-    const text = (data.content || [])
-      .filter((b) => b.type === "text")
-      .map((b) => b.text)
-      .join("")
-      .trim();
-
-    return Response.json({ text });
-  } catch (e) {
-    return Response.json({ error: String(e.message || e) }, { status: 502 });
+Website: ${practice.website || "none listed"}
+Estimated size: ${
+    practice.estimatedClinicians
+      ? `${practice.estimatedClinicians} clinicians`
+      : "not established"
   }
+
+THE OPENING DETAIL TO USE
+${hook || "none recorded, open with the most specific signal below instead"}
+
+SIGNALS OBSERVED ON THEIR OWN PUBLIC WEBSITE
+${signals.length ? signals.map((s) => "- " + s).join("\n") : "- none recorded"}
+${angle ? `\nANGLE THE SENDER WANTS TO TAKE\n${angle}\n` : ""}
+RULES
+- Under 120 words in the body. Five short paragraphs at most.
+- Open with something specific to THIS practice drawn from the hook or signals. Never a generic opener, never flattery about their website.
+- Peer to peer. One psychiatrist writing to another practice owner. Plain, unsalesy, no marketing register.
+- State plainly, in the sender's own voice, that Flow does not diagnose, treat, or replace clinical judgement.
+- Ask for a short conversation. Do not offer a demo, a deck, a trial or a calendar link.
+- No em dashes. No exclamation marks. No invented metrics, patient numbers, revenue claims or any fact not given above.
+- Sign off as ${SENDER.signoff}.
+
+Return JSON only, no fence:
+{"subject":"under 60 characters, specific, lowercase-ish and human","body":"the email body including the signoff"}`;
+
+  const { text, error } = await callClaude({ prompt, maxTokens: 800 });
+  if (error) return Response.json({ error }, { status: 502 });
+
+  const parsed = extractJson(text);
+  if (parsed?.body) {
+    return Response.json({
+      subject: parsed.subject || `A question about ${practice.name}`,
+      body: parsed.body.trim(),
+    });
+  }
+
+  // Fall back to treating the first line as the subject.
+  const lines = (text || "").split("\n").filter(Boolean);
+  const first = lines[0] || "";
+  const subject = /^subject\s*:/i.test(first)
+    ? first.replace(/^subject\s*:\s*/i, "").trim()
+    : `A question about ${practice.name}`;
+  const body = /^subject\s*:/i.test(first)
+    ? lines.slice(1).join("\n").trim()
+    : (text || "").trim();
+
+  return Response.json({ subject, body });
 }
