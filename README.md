@@ -61,7 +61,7 @@ subject line and body.
 
     SERPAPI_API_KEY=...       # required, Google Maps sourcing
     ANTHROPIC_API_KEY=...     # required, qualification and drafting
-    ANTHROPIC_MODEL=...       # optional, defaults to claude-sonnet-5
+    ANTHROPIC_MODEL=...       # optional, defaults to claude-opus-5
     JINA_API_KEY=...          # optional, raises the site-reading rate limit
 
 See `.env.example`.

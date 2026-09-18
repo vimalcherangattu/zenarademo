@@ -65,7 +65,11 @@ Return JSON only, no markdown fence, no commentary:
  "signals":["short factual signal drawn from the evidence","another"],
  "hook":"one concrete detail about this practice to open an email with"}`;
 
-  const { text, error } = await callClaude({ prompt, maxTokens: 900 });
+  const { text, error } = await callClaude({
+    prompt,
+    maxTokens: 8000,
+    effort: "medium",
+  });
   if (error) return Response.json({ error }, { status: 502 });
 
   const parsed = extractJson(text);

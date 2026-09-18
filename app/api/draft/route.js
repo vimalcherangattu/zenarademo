@@ -47,7 +47,11 @@ RULES
 Return JSON only, no fence:
 {"subject":"under 60 characters, specific, lowercase-ish and human","body":"the email body including the signoff"}`;
 
-  const { text, error } = await callClaude({ prompt, maxTokens: 800 });
+  const { text, error } = await callClaude({
+    prompt,
+    maxTokens: 6000,
+    effort: "medium",
+  });
   if (error) return Response.json({ error }, { status: 502 });
 
   const parsed = extractJson(text);

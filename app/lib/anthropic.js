@@ -1,8 +1,16 @@
 // Thin wrapper over the Messages API. Server-side only.
 
-export const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
+export const MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-5";
 
-export async function callClaude({ prompt, maxTokens = 700, system }) {
+// Thinking is on by default on current models and its tokens count against
+// max_tokens, so these budgets have to leave room for it or the JSON gets
+// truncated before it is emitted.
+export async function callClaude({
+  prompt,
+  maxTokens = 4000,
+  effort = "medium",
+  system,
+}) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) {
     return { error: "ANTHROPIC_API_KEY is not set on the server." };
@@ -11,6 +19,7 @@ export async function callClaude({ prompt, maxTokens = 700, system }) {
   const body = {
     model: MODEL,
     max_tokens: maxTokens,
+    output_config: { effort },
     messages: [{ role: "user", content: prompt }],
   };
   if (system) body.system = system;
@@ -30,13 +39,27 @@ export async function callClaude({ prompt, maxTokens = 700, system }) {
     const data = await r.json();
     if (data.error) return { error: data.error.message || "Model call failed." };
 
+    // A refusal returns 200 with no usable text, so check before reading content.
+    if (data.stop_reason === "refusal") {
+      return {
+        error: `The model declined this request${
+          data.stop_details?.category ? ` (${data.stop_details.category})` : ""
+        }.`,
+      };
+    }
+
+    // Thinking blocks are skipped here; only text blocks carry the answer.
     const text = (data.content || [])
       .filter((b) => b.type === "text")
       .map((b) => b.text)
       .join("")
       .trim();
 
-    return { text };
+    if (data.stop_reason === "max_tokens" && !text) {
+      return { error: "The response hit the token limit before any output." };
+    }
+
+    return { text, truncated: data.stop_reason === "max_tokens" };
   } catch (e) {
     return { error: String(e?.message || e) };
   }
