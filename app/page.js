@@ -178,7 +178,8 @@ export default function Page() {
         estimatedClinicians: q.estimatedClinicians,
         clinicianBasis: q.clinicianBasis,
         scores: q.scores,
-        reason: q.reason || q.error || "",
+        reason: q.reason || "",
+        failure: q.error || null,
         signals: q.signals || [],
         hook: q.hook || "",
         state: "qualified",
@@ -186,6 +187,13 @@ export default function Page() {
       done++;
       setStatus(`Qualified ${done} of ${dataRef.current.length}`);
     });
+
+    // A key or config problem fails every row identically. Say so once, at the
+    // top, rather than leaving the same message repeated on every card.
+    const failures = dataRef.current.filter((r) => r.failure);
+    if (failures.length === dataRef.current.length) {
+      setErr(`Qualification failed for every practice. ${failures[0].failure}`);
+    }
 
     // Draft, for whatever clears the bar
     setStage(3);
@@ -531,6 +539,13 @@ export default function Page() {
               </span>
             )}
 
+            {r.failure && (
+              <div className="failure">
+                <div className="fh">Could not qualify this practice</div>
+                {r.failure}
+              </div>
+            )}
+
             {r.reason && (
               <div className="reason">
                 <div className="rh">Agent reasoning</div>
@@ -574,6 +589,13 @@ export default function Page() {
                 {(r.readNote || "Site could not be read").replace(/\.$/, "")}, so
                 qualification ran on the listing alone.
               </p>
+            )}
+
+            {r.draftError && (
+              <div className="failure">
+                <div className="fh">Could not draft an email</div>
+                {r.draftError}
+              </div>
             )}
 
             {r.draft && (

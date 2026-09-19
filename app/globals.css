@@ -100,6 +100,11 @@ button{font-family:inherit;font-size:14px;font-weight:500;cursor:pointer;border-
 .v-pending{background:var(--amber);color:#fff}
 .v-meta{background:var(--soft2);color:var(--muted)}
 
+.failure{background:#FBEAE8;color:#8C3529;border-radius:7px;padding:11px 13px;
+  font-size:13px;margin-bottom:11px}
+.failure .fh{font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+  font-weight:600;margin-bottom:5px;opacity:.8}
+@media (prefers-color-scheme: dark){.failure{background:#3A1F1C;color:#E8A79D}}
 .reason{background:var(--soft);border-radius:7px;padding:11px 13px;font-size:13px;margin-bottom:11px}
 .reason .rh{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--euc);font-weight:600;margin-bottom:5px}
 

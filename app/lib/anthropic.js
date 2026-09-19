@@ -24,14 +24,20 @@ export async function callClaude({
   };
   if (system) body.system = system;
 
+  const headers = {
+    "Content-Type": "application/json",
+    "x-api-key": key,
+    "anthropic-version": "2023-06-01",
+  };
+  // An org-level key has to name a workspace; a workspace-scoped key does not.
+  if (process.env.ANTHROPIC_WORKSPACE_ID) {
+    headers["anthropic-workspace-id"] = process.env.ANTHROPIC_WORKSPACE_ID;
+  }
+
   try {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": key,
-        "anthropic-version": "2023-06-01",
-      },
+      headers,
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(50000),
     });
